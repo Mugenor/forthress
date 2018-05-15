@@ -206,7 +206,6 @@ comma
 exit
 execute
 number 
-state
 here
 equals
 prints

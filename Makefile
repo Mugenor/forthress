@@ -14,7 +14,7 @@ all: bin/forthress
 	
 bin/forthress: obj/forthress.o obj/util.o
 	mkdir -p bin 
-	ld -o bin/forthress obj/forthress.o obj/util.o
+	$(LINKER) -o bin/forthress obj/forthress.o obj/util.o
 
 obj/forthress.o: src/forthress.asm src/macro.inc src/words.inc src/util.inc
 	mkdir -p obj
