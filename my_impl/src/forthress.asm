@@ -1,5 +1,5 @@
-%include "macro.inc"
 %include "lib.inc"
+%include "macro.inc"
 
 %define pc r15
 %define w r14
@@ -36,5 +36,6 @@ next:
 	mov w, [w]
 	jmp [w]
 	
-_start:
+global _start
+_start:	
 	jmp i_init

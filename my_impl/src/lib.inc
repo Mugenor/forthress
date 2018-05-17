@@ -1,6 +1,7 @@
 %ifndef _LIB_
 %define _LIB_
 
+extern in_fd
 extern string_length
 extern print_string
 extern print_error

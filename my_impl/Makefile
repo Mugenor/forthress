@@ -12,7 +12,7 @@ obj/forthress.o: src/forthress.asm src/macro.inc src/words.inc src/lib.inc src/l
 	mkdir -p obj
 	$(ASM) $(FLAGS) src/forthress.asm -o obj/forthress.o
 
-obj/util.o: src/lib.inc src/lib.asm
+obj/lib.o: src/lib.inc src/lib.asm
 	mkdir -p obj
 	$(ASM) $(FLAGS) src/lib.asm -o obj/lib.o
 clean: 

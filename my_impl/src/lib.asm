@@ -114,6 +114,7 @@ string_equals:
     ret
 
 section .data
+global in_fd
 in_fd: dq 0
 
 section .text
@@ -136,9 +137,6 @@ word_buffer times 256 db 0
 section .text
 global read_word:
 read_word:
-	cmp rsi, 1
-	jb .end
-
     push r14
     xor r14, r14  
 	
@@ -220,6 +218,7 @@ parse_uint:
     xor rax, rax
     xor rdx, rdx
     xor r8, r8
+	xor r10, r10
     mov r9, rdi
     .loop1:
 		cmp byte[r9], '0'
@@ -234,7 +233,6 @@ parse_uint:
 	cmp r9, rdi
 	je .end
 	mov r8, 1
-	xor r10, r10
 	mov r11, 10
 	.loop2:
 		dec r9
@@ -259,7 +257,8 @@ parse_uint:
 
 ; rdi points to a string
 ; returns rax: number, rdx : length
-global parse_int:
+global parse_int
+parse_int:
 	xor rdx, rdx
 	xor rax, rax
 	cmp byte[rdi], '-'
