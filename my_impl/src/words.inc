@@ -1,3 +1,4 @@
+; rot 
 section .data
 	stack_base: dq 0
 ; Shows all stack contents. Does not pop elements
@@ -19,6 +20,24 @@ native ".", dot
 	call print_int
 	call print_newline
 	jmp next
+
+; Read word and place its address on stack
+; ( -- a )
+colon "'", tick, 1
+	dq xt_inbuf, xt_word, xt_drop
+	dq xt_inbuf, xt_find, xt_dup
+	branch0 .no_word
+	dq xt_cfa
+	dq xt_state, xt_fetch
+	branch0 .interpret
+	dq xt_lit, xt_lit
+	dq xt_comma, xt_comma ; sequence of commands xt_lit, xt
+.interpret:
+	dq xt_exit
+.no_word:
+	dq xt_inbuf, xt_prints
+	dq xt_lit, msg_no_such_word, xt_prints
+	dq xt_exit
 
 ; output one character from TOS
 native "emit", emit
@@ -68,14 +87,44 @@ colon "interpret", interpret
 	dq xt_find, xt_dup ; ( word_headerX2 )
 	branch0	.not_word
 	dq xt_cfa
+	dq xt_state, xt_fetch
+	branch0 .interpret
+	dq xt_dup
+	; ( xt xt )
+	; check for IMMEDIATE
+	dq xt_lit, 1, xt_minus, xt_fetch_char, xt_not ; ( flag xt )
+	branch0 .interpret		; if flag=0 then interpret word
+	dq xt_comma
+	dq xt_exit
+
+.interpret:	
 	dq xt_execute
 	dq xt_exit
 .not_word:
+	; ( word_header )
 	dq xt_drop
 	dq xt_inbuf
 	dq xt_number ; ( int len )
 	dq xt_swap
 	branch0 .error
+	; ( int )
+	dq xt_state, xt_fetch
+	branch0 .number_interpret
+	dq xt_here, xt_lit, 8, xt_minus, xt_fetch, xt_dup 
+	; ( prev_xt prev_xt int )
+	dq xt_lit, xt_branch, xt_equals
+	; ( res prev_xt int )
+	dq xt_swap, xt_lit, xt_branch0, xt_equals
+	dq xt_lor
+	branch0 .lit_numb
+	dq xt_comma, xt_exit
+	
+.lit_numb:
+	; ( int )
+	dq xt_lit, xt_lit, xt_comma, xt_comma
+	dq xt_exit
+	
+.number_interpret:
 	dq xt_exit
 .error:
 	dq xt_inbuf, xt_prints
@@ -102,6 +151,42 @@ native ">r", to_r
 native "r>", from_r
 	rpop rax
 	push rax
+	jmp next
+	
+native "r@", r_fetch
+	push qword[rstack]
+	jmp next
+
+native "land", land
+	pop rax
+	pop rdx
+	test  rax, rax
+	jz .zero
+	push rdx
+	jmp next
+.zero:
+	push rax
+	jmp next
+	
+native "lor", lor
+	pop rax
+	pop rdx
+	test rax, rax
+	jnz .not_zero
+	push rdx
+	jmp next
+.not_zero:
+	push rax
+	jmp next
+	
+native "and", and
+	pop rax
+	and [rsp], rax
+	jmp next
+	
+native "or", or
+	pop rax
+	or [rsp], rax
 	jmp next
 
 ; (addr val -- )
@@ -140,11 +225,10 @@ native "dup", dup
 native "find", find
 	mov rsi, [last_word]
 	
-	;FOR COMPILING
 	mov rax, [state]
 	test rax, rax
 	jz .loop
-	mov rsi, [rsi]
+	mov rsi, [rsi]	; in compiling mode skipping first word
 .loop:
 	mov rdi, [rsp]
 	push rsi	
@@ -195,10 +279,7 @@ native "cfa", cfa
 	push rax
 	jmp next
 
-; pushes state value on stack (0 - interpretation, 1 - compilation)	
-const state, state
 
-const inbuf, input_buf
 
 ;(addr -- value)
 native "@", fetch
@@ -253,12 +334,6 @@ native "%", mod
 	push rdx
 	jmp next
 	
-;(addr -- char)
-native "c@", fetch_char
-	pop rax
-	movzx rax, byte[rax]
-	push rax
-	jmp next
 	
 ;(0 -- 1)
 ;(1 -- 0)
@@ -277,6 +352,15 @@ native "swap", swap
 	push rdi
 	jmp next
 	
+native "rot", rot
+	pop rax
+	pop rdx
+	pop rdi
+	push rax
+	push rdi
+	push rdx
+	jmp next
+	
 native "drop", drop
 	add rsp, 8
 	jmp next
@@ -287,6 +371,13 @@ native ",", comma
 	mov rax, [here]
 	pop qword[rax]
 	add qword[here], 8
+	jmp next
+	
+native "c,", char_comma
+	mov rax, [here]
+	pop rdx
+	mov [rax], dl
+	add qword[here], 1
 	jmp next
 
 ;exit from colon word
@@ -303,7 +394,14 @@ native "number", number
 	push rax
 	jmp next
 
+; pushes state value on stack (0 - interpretation, 1 - compilation)	
+const state, state
+const inbuf, input_buf
 const here, [here]
+const last_word, last_word
+const mem, user_mem
+const dp, dp
+const in_fd, in_fd
 
 ;( a b -- c)
 ;if (a==b) c=1; else c=0;
@@ -332,11 +430,11 @@ native "prints", prints
 	call print_string
 	jmp next
 	
-native "bye", bye
+colon "bye", bye
 	dq xt_lit, 60
 	dq xt_lit, 0
 	dq xt_lit, 0
-	dq xt_lit, 0
+	dq xt_lit, 0 
 	dq xt_lit, 0
 	dq xt_lit, 0
 	dq xt_lit, 0
@@ -368,14 +466,65 @@ native "syscall", syscall
 	push rax
 	jmp next
 	
-; Read word from stdin and start defining it
-colon ":", colon
-.no_word:
-	dq xt_inbuf, xt_word
-	branch0 .no_word
-	
-	
-	
+; ( str cnt -- )
+; Prints cnt chars from str
+native "printc", printc
+	mov rax, 1
+	mov rdi, 1
+	pop rsi
+	pop rdx
+	syscall
+	jmp next
 
+; Copy a string to a buffer
+; ( dst src -- )
+native "str_copy", str_copy
+	pop rsi
+	pop rdi
+	call string_copy
+	jmp next
+
+; ( name flags --  )
+; Create an entry in the dictionary
+; name is the new name as a null-terminated string
+; only immediate flag is implemented ATM	
+native "create", create
+	mov rsi, [here]
+	mov rcx, [last_word]
+	mov [rsi], rcx
+	mov [last_word], rsi
+	add rsi, 8
+	
+	pop rdi
+	push rsi
+	call string_copy
+	pop rdi
+	push rdi
+	call string_length
+	pop rsi
+	add rsi, rax
+	inc rsi
+	pop rax
+	mov [rsi], al
+	inc rsi
+	
+	mov [here], rsi
+	jmp next
 	
 	
+; Read word from stdin and start defining it
+
+colon ":", colon
+.again:
+	dq xt_inbuf, xt_word
+	branch0 .again
+	dq xt_lit, 0, xt_inbuf, xt_create
+	dq xt_lit, i_docol, xt_comma
+	dq xt_lit, 1, xt_state, xt_write
+	dq xt_exit
+
+; End the current word definition	
+colon ";", semicolon, 1
+	dq xt_lit, xt_exit, xt_comma
+	dq xt_lit, 0, xt_state, xt_write
+	dq xt_exit

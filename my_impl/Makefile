@@ -17,6 +17,3 @@ obj/lib.o: src/lib.inc src/lib.asm
 	$(ASM) $(FLAGS) src/lib.asm -o obj/lib.o
 clean: 
 	rm -rf build obj
-
-.PHONY: clean
-

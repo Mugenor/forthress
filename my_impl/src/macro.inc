@@ -20,7 +20,6 @@
 %macro colon 3
 	section .data
 	wh_ %+ %2: dq previous_word
-	db 0
 	str_ %+ %2: db %1, 0
 	db %3
 	
